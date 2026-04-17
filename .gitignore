@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints
+
+# Data files (too large for GitHub)
+data/raw/*.csv
+data/processed/*.csv
+*.db
+*.sqlite
+
+# Model files (large)
+*.pkl
+*.pth
+*.joblib
+*.h5
+*.hdf5
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+mlruns/
+mlflow.db
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.pid
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Output files
+*.png
+*.jpg
+*.jpeg
+reports/
+
+# Temporary files
+tmp/
+temp/

@@ -1,0 +1,22 @@
+cat > docker-compose.yml << EOF
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: retailpulse
+      POSTGRES_PASSWORD: securepassword
+      POSTGRES_DB: retailpulse_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
+  EOF
