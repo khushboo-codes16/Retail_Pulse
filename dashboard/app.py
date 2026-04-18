@@ -6,6 +6,8 @@ import joblib
 from datetime import datetime, timedelta
 import hashlib
 
+import joblib
+model = joblib.load('models/churn_model.pkl')
 # Page config
 st.set_page_config(page_title="RetailPulse - AI Analytics", layout="wide")
 
@@ -128,14 +130,21 @@ elif page == "👥 Customer Segments":
 
 elif page == "⚠️ Churn Risk":
     st.title("Customer Churn Risk Analysis")
-    
+
+    # Apply ML model
+    try:
+        features = at_risk.drop(columns=['Customer ID'], errors='ignore')
+        at_risk['Churn Probability'] = model.predict_proba(features)[:, 1]
+    except Exception as e:
+        st.error(f"Model error: {e}")
+
     st.metric("Customers at Risk", len(at_risk), 
               delta=f"{len(at_risk) / segments['Customer ID'].nunique():.1%} of total")
-    
-    st.subheader("At-Risk Customers")
+
+    st.subheader("At-Risk Customers with ML Prediction")
     st.dataframe(at_risk.head(50))
-    
-    # Download at-risk list
+
+    # Download
     csv = at_risk.to_csv(index=False)
     st.download_button("Download At-Risk List", csv, "at_risk_customers.csv", "text/csv")
 
