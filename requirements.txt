@@ -25,3 +25,4 @@ great-expectations
 pyjwt
 passlib
 bcrypt
+streamlit-option-menu>=0.3.0
