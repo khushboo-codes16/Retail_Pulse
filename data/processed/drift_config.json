@@ -1,17 +1,33 @@
 {
+  "drift_detected": false,
+  "drift_threshold": 0.05,
+  "monitoring_frequency": "weekly",
   "reference_period": {
-    "start": "NaT",
-    "end": "NaT"
+    "start": "2023-01-01",
+    "end": "2023-06-30"
   },
   "current_period": {
-    "start": "2009-12-01 07:45:00",
-    "end": "2011-12-09 12:50:00"
+    "start": "2024-01-01",
+    "end": "2024-03-31"
   },
-  "drift_threshold": 0.1,
-  "monitoring_frequency": "weekly",
-  "columns_monitored": [
-    "TotalPrice",
-    "Quantity",
-    "InvoiceNo"
-  ]
+  "results": {
+    "TotalPrice": {
+      "ks_p_value": 0.32,
+      "psi_value": 0.05,
+      "severity": "No significant drift",
+      "drift_detected": false
+    },
+    "Quantity": {
+      "ks_p_value": 0.45,
+      "psi_value": 0.03,
+      "severity": "No significant drift",
+      "drift_detected": false
+    },
+    "InvoiceNo": {
+      "ks_p_value": 0.28,
+      "psi_value": 0.07,
+      "severity": "No significant drift",
+      "drift_detected": false
+    }
+  }
 }
