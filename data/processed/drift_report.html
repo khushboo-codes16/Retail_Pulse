@@ -1,0 +1,104 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RetailPulse - Drift Detection Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        h1 { color: #333; }
+        h2 { color: #666; margin-top: 30px; }
+        .drift-detected { color: red; font-weight: bold; }
+        .no-drift { color: green; font-weight: bold; }
+        .moderate { color: orange; font-weight: bold; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #4CAF50; color: white; }
+        .metric { font-size: 24px; font-weight: bold; margin: 10px 0; }
+        .box { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>📊 RetailPulse - Drift Detection Report</h1>
+    <p><strong>Generated:</strong> 2026-04-19 21:25:30</p>
+
+    <div class="box">
+        <h2>Overall Status</h2>
+        <p class="metric no-drift">
+            ✅ No Significant Drift Detected
+        </p>
+    </div>
+
+    <div class="box">
+        <h2>Data Periods</h2>
+        <p><strong>Reference Period:</strong> NaT to NaT</p>
+        <p><strong>Current Period:</strong> 2009-12-01 to 2011-12-09</p>
+        <p><strong>Reference Days:</strong> 0</p>
+        <p><strong>Current Days:</strong> 31376</p>
+    </div>
+
+    <h2>Column-wise Results</h2>
+    <table>
+        <tr>
+            <th>Column</th>
+            <th>KS Test p-value</th>
+            <th>KS Drift</th>
+            <th>PSI Value</th>
+            <th>PSI Severity</th>
+            <th>Overall Status</th>
+        </tr>
+
+        <tr>
+            <td><strong>TotalPrice</strong></td>
+            <td>1.0000</td>
+            <td class="no-drift">Stable</td>
+            <td>0.000</td>
+            <td class="no-drift">Insufficient data</td>
+            <td class="no-drift">Stable</td>
+        </tr>
+        
+        <tr>
+            <td><strong>Quantity</strong></td>
+            <td>1.0000</td>
+            <td class="no-drift">Stable</td>
+            <td>0.000</td>
+            <td class="no-drift">Insufficient data</td>
+            <td class="no-drift">Stable</td>
+        </tr>
+        
+        <tr>
+            <td><strong>Invoice</strong></td>
+            <td>1.0000</td>
+            <td class="no-drift">Stable</td>
+            <td>0.000</td>
+            <td class="no-drift">Insufficient data</td>
+            <td class="no-drift">Stable</td>
+        </tr>
+        
+    </table>
+
+    <div class="box">
+        <h2>Recommendations</h2>
+        <ul>
+
+            <li>✅ Continue regular monitoring (weekly)</li>
+            <li>📊 Current models are performing as expected</li>
+            <li>📅 Schedule next drift check in 7 days</li>
+            <li>🎯 No immediate action required</li>
+        
+        </ul>
+    </div>
+
+    <div class="box">
+        <h2>Next Steps</h2>
+        <ol>
+            <li>Run drift detection weekly (every Monday)</li>
+            <li>Set up alerts when drift is detected</li>
+            <li>Trigger automatic retraining pipeline if drift persists for 2 weeks</li>
+            <li>Maintain drift history for audit purposes</li>
+        </ol>
+    </div>
+
+    <hr>
+    <p><em>RetailPulse - AI-Powered Customer Analytics Platform</em></p>
+</body>
+</html>

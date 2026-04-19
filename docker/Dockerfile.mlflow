@@ -1,0 +1,22 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install MLflow
+RUN pip install --no-cache-dir mlflow psycopg2-binary
+
+# Create directory for MLflow artifacts
+RUN mkdir -p /app/mlflow_artifacts
+
+# Expose port
+EXPOSE 5000
+
+# Create startup script
+RUN echo '#!/bin/bash\n\
+mlflow server \
+    --backend-store-uri postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:5432/${DB_NAME} \
+    --default-artifact-root /app/mlflow_artifacts \
+    --host 0.0.0.0 \
+    --port 5000' > /app/start.sh && chmod +x /app/start.sh
+
+CMD ["/app/start.sh"]

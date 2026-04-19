@@ -1,0 +1,282 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: retailpulse
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: retailpulse-secrets
+  namespace: retailpulse
+type: Opaque
+data:
+  db-password: c2VjdXJlcGFzc3dvcmQ=  # base64 for "securepassword"
+  api-secret-key: eW91ci1zdXBlci1zZWNyZXQta2V5LWNoYW5nZS10aGlz
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: retailpulse-config
+  namespace: retailpulse
+data:
+  db-user: retailpulse
+  db-name: retailpulse_db
+  redis-url: redis://redis-service:6379
+  mlflow-tracking-uri: http://mlflow-service:5000
+  environment: production
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: retailpulse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            configMapKeyRef:
+              name: retailpulse-config
+              key: db-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: retailpulse-secrets
+              key: db-password
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: retailpulse-config
+              key: db-name
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: retailpulse
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: retailpulse
+spec:
+  selector:
+    app: postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: retailpulse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: retailpulse
+spec:
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: retailpulse-api
+  namespace: retailpulse
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: retailpulse-api
+  template:
+    metadata:
+      labels:
+        app: retailpulse-api
+    spec:
+      containers:
+      - name: api
+        image: retailpulse/api:latest
+        env:
+        - name: DATABASE_URL
+          value: postgresql://$(DB_USER):$(DB_PASSWORD)@postgres-service:5432/$(DB_NAME)
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: retailpulse-config
+              key: redis-url
+        - name: MLFLOW_TRACKING_URI
+          valueFrom:
+            configMapKeyRef:
+              name: retailpulse-config
+              key: mlflow-tracking-uri
+        ports:
+        - containerPort: 8000
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-service
+  namespace: retailpulse
+spec:
+  selector:
+    app: retailpulse-api
+  ports:
+  - port: 8000
+    targetPort: 8000
+  type: LoadBalancer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: retailpulse-dashboard
+  namespace: retailpulse
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: retailpulse-dashboard
+  template:
+    metadata:
+      labels:
+        app: retailpulse-dashboard
+    spec:
+      containers:
+      - name: dashboard
+        image: retailpulse/dashboard:latest
+        env:
+        - name: API_URL
+          value: http://api-service:8000
+        - name: DASHBOARD_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: retailpulse-secrets
+              key: dashboard-password
+        ports:
+        - containerPort: 8501
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard-service
+  namespace: retailpulse
+spec:
+  selector:
+    app: retailpulse-dashboard
+  ports:
+  - port: 8501
+    targetPort: 8501
+  type: LoadBalancer
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: retailpulse-api-hpa
+  namespace: retailpulse
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: retailpulse-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

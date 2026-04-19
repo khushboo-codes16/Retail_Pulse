@@ -1,0 +1,17 @@
+{
+  "reference_period": {
+    "start": "NaT",
+    "end": "NaT"
+  },
+  "current_period": {
+    "start": "2009-12-01 07:45:00",
+    "end": "2011-12-09 12:50:00"
+  },
+  "drift_threshold": 0.1,
+  "monitoring_frequency": "weekly",
+  "columns_monitored": [
+    "TotalPrice",
+    "Quantity",
+    "InvoiceNo"
+  ]
+}

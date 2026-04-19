@@ -1,0 +1,36 @@
+{
+  "best_xgboost_params": {
+    "n_estimators": 450,
+    "max_depth": 3,
+    "learning_rate": 0.10512572072356065,
+    "subsample": 0.8613270974412328,
+    "colsample_bytree": 0.6823322405209782,
+    "min_child_weight": 8,
+    "gamma": 4.348720249941354,
+    "reg_alpha": 0.8809743755571824,
+    "reg_lambda": 1.5891035844995056,
+    "scale_pos_weight": 0.9653979238754326
+  },
+  "best_xgboost_auc": 1.0,
+  "best_prophet_params": {
+    "cp": 0.01,
+    "sp": 0.01,
+    "hp": 0.01,
+    "mape": 6.359094040212396e+18
+  },
+  "feature_importance": {
+    "avg_quantity": "0.012051417",
+    "std_quantity": "0.0",
+    "total_quantity": "0.052368052",
+    "avg_price": "0.0088968845",
+    "std_price": "0.009347891",
+    "avg_order_value": "0.0",
+    "std_order_value": "0.0",
+    "total_spent": "0.07905497",
+    "customer_lifespan": "0.13449737",
+    "unique_products": "0.025026832",
+    "Recency": "0.52732974",
+    "Frequency": "0.12207233",
+    "Monetary": "0.02935452"
+  }
+}
