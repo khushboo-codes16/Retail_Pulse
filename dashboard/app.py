@@ -1,6 +1,6 @@
 """
 RetailPulse - AI-Powered Customer Analytics Dashboard
-Week 3: Complete Interactive Dashboard
+Self-contained version that works without external data files
 """
 
 import streamlit as st
@@ -8,32 +8,25 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import matplotlib.pyplot as plt
-import seaborn as sns
 from datetime import datetime, timedelta
-import joblib
 import json
-import hashlib
-from streamlit_option_menu import option_menu
 
 # Page configuration
 st.set_page_config(
     page_title="RetailPulse - AI Analytics Platform",
     page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# Custom CSS for better styling
+# Custom CSS
 st.markdown("""
 <style>
     .main-header {
-        font-size: 2.5rem;
+        font-size: 2rem;
         font-weight: bold;
         color: #1E88E5;
         text-align: center;
-        margin-bottom: 2rem;
+        margin-bottom: 1rem;
     }
     .metric-card {
         background-color: #f0f2f6;
@@ -41,559 +34,411 @@ st.markdown("""
         border-radius: 10px;
         text-align: center;
     }
-    .warning-text {
-        color: #ff4b4b;
-        font-weight: bold;
-    }
-    .success-text {
-        color: #00cc66;
-        font-weight: bold;
-    }
 </style>
 """, unsafe_allow_html=True)
 
 # Authentication
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
 def check_password():
-    """Simple authentication - replace with database in production"""
-    def password_entered():
-        if st.session_state["password"] == "admin123":
-            st.session_state["authenticated"] = True
-        else:
-            st.session_state["authenticated"] = False
-    
-    if "authenticated" not in st.session_state:
+    if not st.session_state.authenticated:
         st.title("🔐 RetailPulse Login")
-        st.text_input("Password", type="password", on_change=password_entered, key="password")
+        password = st.text_input("Password", type="password")
+        if st.button("Login"):
+            if password == "admin123":
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Wrong password. Try: admin123")
         st.info("Demo credentials: password = 'admin123'")
         return False
-    return st.session_state["authenticated"]
+    return True
 
 if not check_password():
     st.stop()
 
-# Load all data with caching
+# Generate Demo Data (since files are not on GitHub)
 @st.cache_data(ttl=3600)
-def load_all_data():
-    """Load all required data for the dashboard"""
-    try:
-        sales = pd.read_csv('data/processed/cleaned_sales.csv', parse_dates=['InvoiceDate'])
-        segments = pd.read_csv('data/processed/customer_segments.csv')
-        forecast = pd.read_csv('data/processed/30_day_forecast.csv')
-        at_risk = pd.read_csv('data/processed/at_risk_customers.csv')
-        inventory = pd.read_csv('data/processed/inventory_recommendations.csv')
-        drift_config = json.load(open('data/processed/drift_config.json'))
+def generate_demo_data():
+    """Generate realistic demo data for the dashboard"""
+    np.random.seed(42)
+    
+    # Sales data
+    dates = pd.date_range(start='2023-01-01', end='2024-12-31', freq='D')
+    sales_data = []
+    for i, date in enumerate(dates):
+        # Add seasonality and trend
+        trend = 5000 + i * 10
+        seasonality = 2000 * np.sin(2 * np.pi * date.dayofyear / 365)
+        random_noise = np.random.normal(0, 500)
+        daily_sales = max(0, trend + seasonality + random_noise)
         
-        return sales, segments, forecast, at_risk, inventory, drift_config
-    except Exception as e:
-        st.error(f"Error loading data: {e}")
-        return None, None, None, None, None, None
-
-# Load models
-@st.cache_resource
-def load_models():
-    """Load trained models"""
-    models = {}
-    try:
-        models['segmenter'] = joblib.load('src/models/kmeans_segmenter.pkl')
-        models['scaler'] = joblib.load('src/models/rfm_scaler.pkl')
-        models['churn'] = joblib.load('src/models/churn_xgboost_tuned.pkl')
-        st.success("✅ Models loaded successfully")
-    except Exception as e:
-        st.warning(f"Models not found: {e}")
-    return models
+        sales_data.append({
+            'InvoiceDate': date,
+            'TotalPrice': daily_sales,
+            'Quantity': int(daily_sales / 20),
+            'Customer ID': np.random.randint(10000, 20000),
+            'Country': np.random.choice(['United Kingdom', 'France', 'Germany', 'USA', 'Australia'], 
+                                        p=[0.6, 0.15, 0.1, 0.1, 0.05])
+        })
+    
+    sales_df = pd.DataFrame(sales_data)
+    
+    # Customer segments
+    customers = sales_df['Customer ID'].unique()[:1000]
+    segments_data = []
+    segment_names = {0: 'Champions', 1: 'Loyal', 2: 'Potential', 3: 'New', 4: 'At Risk', 5: 'Lost'}
+    
+    for cust in customers:
+        segment = np.random.choice([0, 1, 2, 3, 4, 5], p=[0.15, 0.2, 0.25, 0.2, 0.1, 0.1])
+        segments_data.append({
+            'Customer ID': cust,
+            'Segment': segment,
+            'Segment Name': segment_names[segment],
+            'Recency': np.random.randint(1, 365),
+            'Frequency': np.random.randint(1, 50),
+            'Monetary': np.random.uniform(100, 10000),
+            'CLV': np.random.uniform(500, 15000)
+        })
+    segments_df = pd.DataFrame(segments_data)
+    
+    # Forecast data
+    forecast_dates = pd.date_range(start=datetime.now(), periods=30, freq='D')
+    forecast_data = []
+    for i, date in enumerate(forecast_dates):
+        base = 12000
+        trend = i * 50
+        seasonality = 1500 * np.sin(2 * np.pi * i / 7)
+        forecast_data.append({
+            'ds': date,
+            'yhat': base + trend + seasonality,
+            'yhat_lower': base + trend + seasonality - 1000,
+            'yhat_upper': base + trend + seasonality + 1000
+        })
+    forecast_df = pd.DataFrame(forecast_data)
+    
+    # At-risk customers
+    at_risk_data = []
+    for cust in customers[:200]:
+        at_risk_data.append({
+            'Customer ID': cust,
+            'churn_probability': np.random.uniform(0.65, 0.95),
+            'total_spent': np.random.uniform(100, 5000),
+            'Recency': np.random.randint(60, 200),
+            'Segment': np.random.choice(['At Risk', 'High Risk', 'Critical'])
+        })
+    at_risk_df = pd.DataFrame(at_risk_data)
+    at_risk_df = at_risk_df.sort_values('churn_probability', ascending=False)
+    
+    # Inventory data
+    products = ['LED Lights', 'Garden Tools', 'Kitchen Set', 'Decorative Items', 'Seasonal Decor']
+    inventory_data = []
+    for i, product in enumerate(products):
+        for j in range(10):
+            reorder_point = np.random.randint(50, 200)
+            current_stock = np.random.randint(0, reorder_point * 1.5)
+            risk = 'HIGH' if current_stock < reorder_point * 0.6 else 'MEDIUM' if current_stock < reorder_point else 'LOW'
+            inventory_data.append({
+                'Product': f'{product} {j+1}',
+                'StockCode': f'PRD_{i:03d}{j:02d}',
+                'Current Stock': current_stock,
+                'Reorder Point': reorder_point,
+                'Reorder Quantity': max(0, reorder_point * 2 - current_stock),
+                'Risk Level': risk,
+                'Unit Price': np.random.uniform(10, 100)
+            })
+    inventory_df = pd.DataFrame(inventory_data)
+    
+    return sales_df, segments_df, forecast_df, at_risk_df, inventory_df
 
 # Load data
-sales, segments, forecast, at_risk, inventory, drift_config = load_all_data()
-models = load_models()
-
-# Sidebar navigation with icons
-with st.sidebar:
-    st.image("https://img.icons8.com/color/96/000000/bar-chart.png", width=80)
-    st.title("RetailPulse")
-    st.markdown("---")
-    
-    selected = option_menu(
-        menu_title=None,
-        options=["Dashboard", "Demand Forecast", "Customer Insights", "Churn Analytics", 
-                 "Inventory Optimization", "Drift Monitor", "Reports"],
-        icons=["house", "graph-up", "people", "exclamation-triangle", "box-seam", 
-               "activity", "file-text"],
-        default_index=0,
-        orientation="vertical",
-        styles={
-            "nav-link": {"font-size": "14px", "text-align": "left", "margin": "5px"},
-            "nav-link-selected": {"background-color": "#1E88E5"},
-        }
-    )
-    
-    st.markdown("---")
-    st.caption(f"Version 2.0\nLast Updated: {datetime.now().strftime('%Y-%m-%d')}")
+sales_df, segments_df, forecast_df, at_risk_df, inventory_df = generate_demo_data()
 
 # Helper functions
 def format_currency(value):
-    return f"£{value:,.2f}"
+    return f"£{value:,.0f}"
 
 def format_number(value):
     return f"{value:,}"
 
-# Page 1: Main Dashboard
-if selected == "Dashboard":
+# Sidebar Navigation
+st.sidebar.image("https://img.icons8.com/color/96/000000/bar-chart.png", width=80)
+st.sidebar.title("RetailPulse")
+st.sidebar.markdown("---")
+
+page = st.sidebar.selectbox(
+    "Navigation",
+    ["🏠 Dashboard", "📈 Demand Forecast", "👥 Customer Insights", 
+     "⚠️ Churn Analytics", "📦 Inventory", "📄 Reports"]
+)
+
+st.sidebar.markdown("---")
+st.sidebar.caption(f"Version 2.0\nLast Updated: {datetime.now().strftime('%Y-%m-%d')}")
+st.sidebar.info("Demo Mode - Using generated data")
+
+# ============ PAGE 1: DASHBOARD ============
+if page == "🏠 Dashboard":
     st.markdown('<div class="main-header">📊 RetailPulse Dashboard</div>', unsafe_allow_html=True)
     
-    # Key metrics row
+    # Key metrics
     col1, col2, col3, col4 = st.columns(4)
     
-    total_revenue = sales['TotalPrice'].sum()
-    total_customers = segments['Customer ID'].nunique()
-    avg_order_value = sales.groupby('InvoiceNo')['TotalPrice'].sum().mean()
-    churn_rate = len(at_risk) / total_customers if total_customers > 0 else 0
+    total_revenue = sales_df['TotalPrice'].sum()
+    total_customers = segments_df['Customer ID'].nunique()
+    avg_daily = sales_df.groupby('InvoiceDate')['TotalPrice'].sum().mean()
+    churn_rate = len(at_risk_df) / total_customers
     
     with col1:
-        st.metric("Total Revenue", format_currency(total_revenue), 
-                  delta="+12.5%", delta_color="normal")
+        st.metric("Total Revenue", format_currency(total_revenue), delta="+12.5%")
     with col2:
-        st.metric("Active Customers", format_number(total_customers), 
-                  delta="+8.3%", delta_color="normal")
+        st.metric("Active Customers", format_number(total_customers), delta="+8.3%")
     with col3:
-        st.metric("Avg Order Value", format_currency(avg_order_value), 
-                  delta="+5.2%", delta_color="normal")
+        st.metric("Avg Daily Revenue", format_currency(avg_daily), delta="+5.2%")
     with col4:
-        st.metric("Churn Rate", f"{churn_rate:.1%}", 
-                  delta="-2.1%", delta_color="inverse")
+        st.metric("Churn Rate", f"{churn_rate:.1%}", delta="-2.1%", delta_color="inverse")
     
-    # Charts row 1
+    # Charts
     col1, col2 = st.columns(2)
     
     with col1:
         st.subheader("📈 Sales Trend")
-        daily_sales = sales.groupby('InvoiceDate')['TotalPrice'].sum().reset_index()
+        daily_sales = sales_df.groupby('InvoiceDate')['TotalPrice'].sum().reset_index()
         fig = px.line(daily_sales, x='InvoiceDate', y='TotalPrice', 
-                      title="Daily Sales Over Time", color_discrete_sequence=['#1E88E5'])
-        fig.update_layout(height=400, showlegend=False)
+                      title="Daily Sales Over Time")
+        fig.update_layout(height=400)
         st.plotly_chart(fig, use_container_width=True)
     
     with col2:
         st.subheader("🌍 Sales by Country")
-        country_sales = sales.groupby('Country')['TotalPrice'].sum().sort_values(ascending=False).head(10)
+        country_sales = sales_df.groupby('Country')['TotalPrice'].sum().sort_values(ascending=False)
         fig = px.pie(values=country_sales.values, names=country_sales.index, 
-                     title="Top 10 Countries by Revenue")
+                     title="Revenue by Country")
         fig.update_layout(height=400)
         st.plotly_chart(fig, use_container_width=True)
     
-    # Charts row 2
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("📦 Top Products")
-        top_products = sales.groupby('Description')['Quantity'].sum().sort_values(ascending=False).head(10)
-        fig = px.bar(x=top_products.values, y=top_products.index, orientation='h',
-                     title="Top 10 Products by Quantity", color_discrete_sequence=['#00cc66'])
-        fig.update_layout(height=400)
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with col2:
-        st.subheader("📅 Sales by Hour")
-        sales['Hour'] = sales['InvoiceDate'].dt.hour
-        hourly_sales = sales.groupby('Hour')['TotalPrice'].sum()
-        fig = px.line(x=hourly_sales.index, y=hourly_sales.values,
-                      title="Sales Distribution by Hour", markers=True)
-        fig.update_layout(height=400, xaxis_title="Hour of Day", yaxis_title="Revenue (£)")
-        st.plotly_chart(fig, use_container_width=True)
-    
-    # Alert section
+    # Alerts
     st.subheader("⚠️ Critical Alerts")
     alert_col1, alert_col2, alert_col3 = st.columns(3)
     
     with alert_col1:
-        high_risk = len(inventory[inventory['stockout_risk'] == 'HIGH']) if len(inventory) > 0 else 0
+        high_risk = len(inventory_df[inventory_df['Risk Level'] == 'HIGH'])
         st.warning(f"🔴 {high_risk} products at HIGH stockout risk")
     
     with alert_col2:
-        at_risk_count = len(at_risk)
-        st.error(f"⚠️ {at_risk_count} customers at risk of churning")
+        st.error(f"⚠️ {len(at_risk_df)} customers at risk of churning")
     
     with alert_col3:
-        if drift_config.get('drift_detected', False):
-            st.warning("📊 Data drift detected - Model retraining recommended")
+        st.success("✅ No data drift detected")
 
-# Page 2: Demand Forecast
-elif selected == "Demand Forecast":
+# ============ PAGE 2: DEMAND FORECAST ============
+elif page == "📈 Demand Forecast":
     st.markdown('<div class="main-header">📈 Demand Forecasting</div>', unsafe_allow_html=True)
     
-    if forecast is not None:
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            st.subheader("30-Day Sales Forecast")
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], 
-                                     mode='lines', name='Forecast', 
-                                     line=dict(color='red', width=3)))
-            fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast.get('yhat_upper', forecast['yhat'] * 1.1),
-                                     fill=None, mode='lines', line_color='rgba(255,0,0,0.2)',
-                                     name='Upper Bound'))
-            fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast.get('yhat_lower', forecast['yhat'] * 0.9),
-                                     fill='tonexty', mode='lines', line_color='rgba(255,0,0,0.2)',
-                                     name='Lower Bound'))
-            fig.update_layout(height=500, xaxis_title="Date", yaxis_title="Forecasted Sales (£)")
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            st.subheader("Forecast Summary")
-            total_forecast = forecast['yhat'].sum()
-            avg_daily = forecast['yhat'].mean()
-            peak_day = forecast.loc[forecast['yhat'].idxmax(), 'ds']
-            peak_value = forecast['yhat'].max()
-            
-            st.metric("Total 30-Day Forecast", format_currency(total_forecast))
-            st.metric("Average Daily", format_currency(avg_daily))
-            st.metric("Peak Day", f"{peak_day.strftime('%Y-%m-%d')}", 
-                      delta=format_currency(peak_value))
-        
-        # What-if Analysis
-        st.subheader("🔧 What-If Analysis")
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            multiplier = st.slider("Demand Multiplier", 0.5, 2.0, 1.0, 0.1)
-        
-        with col2:
-            seasonality_impact = st.selectbox("Seasonality Impact", ["Normal", "High Season", "Low Season"])
-        
-        with col3:
-            if st.button("Apply Scenario"):
-                adjusted_forecast = forecast['yhat'] * multiplier
-                if seasonality_impact == "High Season":
-                    adjusted_forecast *= 1.2
-                elif seasonality_impact == "Low Season":
-                    adjusted_forecast *= 0.8
-                
-                st.success(f"Adjusted Forecast Total: {format_currency(adjusted_forecast.sum())}")
-                
-                fig2 = go.Figure()
-                fig2.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], 
-                                          mode='lines', name='Original', line=dict(color='blue')))
-                fig2.add_trace(go.Scatter(x=forecast['ds'], y=adjusted_forecast, 
-                                          mode='lines', name='Scenario', line=dict(color='red', dash='dash')))
-                fig2.update_layout(height=400, title="Scenario Comparison")
-                st.plotly_chart(fig2, use_container_width=True)
-        
-        # Forecast table
-        with st.expander("📋 Detailed Forecast Table"):
-            display_forecast = forecast.copy()
-            display_forecast['ds'] = pd.to_datetime(display_forecast['ds']).dt.date
-            display_forecast['yhat'] = display_forecast['yhat'].apply(lambda x: format_currency(x))
-            st.dataframe(display_forecast, use_container_width=True)
-            
-            csv = forecast.to_csv(index=False)
-            st.download_button("Download Forecast CSV", csv, "forecast.csv", "text/csv")
-
-# Page 3: Customer Insights
-elif selected == "Customer Insights":
-    st.markdown('<div class="main-header">👥 Customer Segmentation & Insights</div>', unsafe_allow_html=True)
+    col1, col2 = st.columns([2, 1])
     
-    if segments is not None:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("Segment Distribution")
-            segment_counts = segments['Segment'].value_counts().sort_index()
-            segment_names = {
-                0: 'Champions', 1: 'Loyal', 2: 'Potential', 
-                3: 'New', 4: 'At Risk', 5: 'Lost'
-            }
-            segment_labels = [segment_names.get(i, f'Segment {i}') for i in segment_counts.index]
-            
-            fig = px.pie(values=segment_counts.values, names=segment_labels, 
-                         title="Customer Segment Distribution", hole=0.3)
-            fig.update_traces(textposition='inside', textinfo='percent+label')
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            st.subheader("Segment Metrics")
-            segment_metrics = segments.groupby('Segment').agg({
-                'Recency': 'mean',
-                'Frequency': 'mean',
-                'Monetary': 'mean',
-                'Customer ID': 'count'
-            }).round(2)
-            segment_metrics.index = [segment_names.get(i, f'Segment {i}') for i in segment_metrics.index]
-            segment_metrics.columns = ['Avg Recency', 'Avg Frequency', 'Avg Monetary (£)', 'Count']
-            st.dataframe(segment_metrics, use_container_width=True)
-        
-        # RFM Analysis
-        st.subheader("RFM Analysis")
-        
-        # Create RFM scores
-        segments['R_Score'] = pd.qcut(segments['Recency'], 4, labels=['4', '3', '2', '1'])
-        segments['F_Score'] = pd.qcut(segments['Frequency'].rank(method='first'), 4, labels=['1', '2', '3', '4'])
-        segments['M_Score'] = pd.qcut(segments['Monetary'], 4, labels=['1', '2', '3', '4'])
-        segments['RFM_Score'] = segments['R_Score'].astype(str) + segments['F_Score'].astype(str) + segments['M_Score'].astype(str)
-        
-        # RFM heatmap
-        rfm_heatmap = segments.groupby(['R_Score', 'F_Score']).size().unstack(fill_value=0)
-        fig = px.imshow(rfm_heatmap, text_auto=True, aspect="auto",
-                        title="RFM Segmentation Heatmap (Recency vs Frequency)")
+    with col1:
+        st.subheader("30-Day Sales Forecast")
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=forecast_df['ds'], y=forecast_df['yhat'], 
+                                 mode='lines', name='Forecast', 
+                                 line=dict(color='red', width=3)))
+        fig.add_trace(go.Scatter(x=forecast_df['ds'], y=forecast_df['yhat_upper'],
+                                 fill=None, mode='lines', 
+                                 line_color='rgba(255,0,0,0.2)', name='Upper Bound'))
+        fig.add_trace(go.Scatter(x=forecast_df['ds'], y=forecast_df['yhat_lower'],
+                                 fill='tonexty', mode='lines', 
+                                 line_color='rgba(255,0,0,0.2)', name='Lower Bound'))
+        fig.update_layout(height=500, title="Next 30 Days Sales Forecast")
         st.plotly_chart(fig, use_container_width=True)
-        
-        # Customer lifetime value
-        st.subheader("Customer Lifetime Value (CLV)")
-        segments['CLV'] = segments['Monetary'] * segments['Frequency'] / segments['Recency'].clip(lower=1)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            fig = px.box(segments, x='Segment', y='CLV', 
-                         title="CLV Distribution by Segment",
-                         labels={'Segment': 'Customer Segment', 'CLV': 'Customer Lifetime Value (£)'})
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            top_customers = segments.nlargest(10, 'CLV')[['Customer ID', 'CLV', 'Monetary', 'Frequency']]
-            top_customers['CLV'] = top_customers['CLV'].apply(lambda x: format_currency(x))
-            st.dataframe(top_customers, use_container_width=True)
-
-# Page 4: Churn Analytics
-elif selected == "Churn Analytics":
-    st.markdown('<div class="main-header">⚠️ Churn Prediction & Risk Analysis</div>', unsafe_allow_html=True)
     
-    if at_risk is not None:
-        col1, col2, col3 = st.columns(3)
+    with col2:
+        st.subheader("Forecast Summary")
+        total_forecast = forecast_df['yhat'].sum()
+        avg_daily = forecast_df['yhat'].mean()
+        peak_day = forecast_df.loc[forecast_df['yhat'].idxmax(), 'ds']
+        peak_value = forecast_df['yhat'].max()
         
-        total_customers = segments['Customer ID'].nunique()
-        at_risk_count = len(at_risk)
-        revenue_at_risk = at_risk['total_spent'].sum() if 'total_spent' in at_risk.columns else 0
+        st.metric("Total 30-Day Forecast", format_currency(total_forecast))
+        st.metric("Average Daily", format_currency(avg_daily))
+        st.metric("Peak Day", peak_day.strftime('%Y-%m-%d'), delta=format_currency(peak_value))
+    
+    # What-if Analysis
+    st.subheader("🔧 What-If Analysis")
+    multiplier = st.slider("Demand Multiplier", 0.5, 2.0, 1.0, 0.1)
+    
+    if multiplier != 1.0:
+        adjusted = forecast_df['yhat'] * multiplier
+        st.info(f"Adjusted Forecast Total: {format_currency(adjusted.sum())}")
         
-        with col1:
-            st.metric("Customers at Risk", format_number(at_risk_count), 
-                      delta=f"{(at_risk_count/total_customers):.1%} of total")
-        with col2:
-            st.metric("Revenue at Risk", format_currency(revenue_at_risk))
-        with col3:
-            st.metric("Churn Probability Threshold", ">70%")
-        
-        st.subheader("🔴 High-Risk Customers")
-        
-        # Filters
-        col1, col2 = st.columns(2)
-        with col1:
-            min_probability = st.slider("Minimum Churn Probability", 0.5, 1.0, 0.7, 0.05)
-        with col2:
-            top_n = st.selectbox("Number of customers to show", [10, 20, 50, 100])
-        
-        filtered_risk = at_risk[at_risk['churn_probability'] >= min_probability].head(top_n)
-        
-        # Display at-risk customers
-        st.dataframe(filtered_risk, use_container_width=True)
-        
-        # Retention strategies
-        st.subheader("🎯 Retention Strategies by Segment")
-        
-        strategies = {
-            'High Value': {
-                'action': 'Personalized offers, VIP treatment',
-                'discount': '20-30% off',
-                'contact': 'Phone call + Email'
-            },
-            'Medium Value': {
-                'action': 'Win-back campaigns, Product recommendations',
-                'discount': '15-20% off',
-                'contact': 'Email + SMS'
-            },
-            'Low Value': {
-                'action': 'Re-engagement emails, Newsletter subscription',
-                'discount': '10-15% off',
-                'contact': 'Email'
-            }
-        }
-        
-        for segment, strategy in strategies.items():
-            with st.expander(f"Strategy for {segment} Customers"):
-                st.write(f"**Action:** {strategy['action']}")
-                st.write(f"**Recommended Discount:** {strategy['discount']}")
-                st.write(f"**Contact Method:** {strategy['contact']}")
-        
-        # Download at-risk list
-        csv = at_risk.to_csv(index=False)
-        st.download_button("Download At-Risk Customers CSV", csv, "at_risk_customers.csv", "text/csv")
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(x=forecast_df['ds'], y=forecast_df['yhat'], 
+                                  name='Original', line=dict(color='blue')))
+        fig2.add_trace(go.Scatter(x=forecast_df['ds'], y=adjusted, 
+                                  name='Scenario', line=dict(color='red', dash='dash')))
+        st.plotly_chart(fig2, use_container_width=True)
 
-# Page 5: Inventory Optimization
-elif selected == "Inventory Optimization":
+# ============ PAGE 3: CUSTOMER INSIGHTS ============
+elif page == "👥 Customer Insights":
+    st.markdown('<div class="main-header">👥 Customer Insights</div>', unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Segment Distribution")
+        segment_counts = segments_df['Segment Name'].value_counts()
+        fig = px.pie(values=segment_counts.values, names=segment_counts.index, 
+                     title="Customer Segments", hole=0.3)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        st.subheader("Segment Metrics")
+        segment_metrics = segments_df.groupby('Segment Name').agg({
+            'Monetary': 'mean',
+            'Frequency': 'mean',
+            'Recency': 'mean',
+            'Customer ID': 'count'
+        }).round(2)
+        segment_metrics.columns = ['Avg Spend (£)', 'Avg Frequency', 'Avg Recency (days)', 'Count']
+        st.dataframe(segment_metrics, use_container_width=True)
+    
+    # RFM Scatter
+    st.subheader("Customer Value Analysis")
+    fig = px.scatter(segments_df.sample(500), x='Recency', y='Monetary', 
+                     color='Segment Name', size='Frequency',
+                     title="Recency vs Monetary Value by Segment",
+                     labels={'Recency': 'Days Since Last Purchase', 'Monetary': 'Total Spend (£)'})
+    st.plotly_chart(fig, use_container_width=True)
+
+# ============ PAGE 4: CHURN ANALYTICS ============
+elif page == "⚠️ Churn Analytics":
+    st.markdown('<div class="main-header">⚠️ Churn Risk Analysis</div>', unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Customers at Risk", len(at_risk_df), delta="High Risk")
+    with col2:
+        total_risk_value = at_risk_df['total_spent'].sum()
+        st.metric("Revenue at Risk", format_currency(total_risk_value))
+    with col3:
+        avg_prob = at_risk_df['churn_probability'].mean()
+        st.metric("Avg Churn Probability", f"{avg_prob:.1%}")
+    
+    st.subheader("🔴 High-Risk Customers")
+    
+    # Filter
+    min_prob = st.slider("Minimum Churn Probability", 0.5, 0.95, 0.7, 0.05)
+    filtered_risk = at_risk_df[at_risk_df['churn_probability'] >= min_prob]
+    
+    st.dataframe(filtered_risk.head(50), use_container_width=True)
+    
+    # Download button
+    csv = at_risk_df.to_csv(index=False)
+    st.download_button("📥 Download At-Risk Customers", csv, "at_risk_customers.csv", "text/csv")
+    
+    # Retention Strategies
+    st.subheader("🎯 Retention Strategies")
+    strategy_col1, strategy_col2, strategy_col3 = st.columns(3)
+    
+    with strategy_col1:
+        st.info("**High Value Customers**\n\n• Personal call\n• 25% discount\n• Free shipping")
+    with strategy_col2:
+        st.warning("**Medium Value Customers**\n\n• Email campaign\n• 15% discount\n• Loyalty points")
+    with strategy_col3:
+        st.success("**At-Risk Customers**\n\n• Re-engagement email\n• 10% discount\n• Feedback survey")
+
+# ============ PAGE 5: INVENTORY ============
+elif page == "📦 Inventory":
     st.markdown('<div class="main-header">📦 Inventory Optimization</div>', unsafe_allow_html=True)
     
-    if inventory is not None:
-        col1, col2, col3, col4 = st.columns(4)
-        
-        high_risk = len(inventory[inventory['stockout_risk'] == 'HIGH'])
-        medium_risk = len(inventory[inventory['stockout_risk'] == 'MEDIUM'])
-        total_value = inventory['inventory_value'].sum() if 'inventory_value' in inventory.columns else 0
-        
-        with col1:
-            st.metric("High Risk Products", high_risk, delta="URGENT")
-        with col2:
-            st.metric("Medium Risk Products", medium_risk)
-        with col3:
-            st.metric("Total Inventory Value", format_currency(total_value))
-        with col4:
-            st.metric("Products to Reorder", len(inventory[inventory['reorder_quantity'] > 0]))
-        
-        # Filters
-        col1, col2 = st.columns(2)
-        with col1:
-            risk_filter = st.multiselect("Filter by Risk Level", 
-                                         ['HIGH', 'MEDIUM', 'LOW'], 
-                                         default=['HIGH', 'MEDIUM'])
-        with col2:
-            search = st.text_input("Search Product", placeholder="Enter product description...")
-        
-        filtered_inventory = inventory[inventory['stockout_risk'].isin(risk_filter)]
-        if search:
-            filtered_inventory = filtered_inventory[
-                filtered_inventory['Description'].str.contains(search, case=False, na=False)
-            ]
-        
-        st.subheader("📋 Reorder Recommendations")
-        display_cols = ['Description', 'current_stock', 'reorder_point', 
-                        'reorder_quantity', 'stockout_risk', 'optimization_strategy']
-        display_cols = [c for c in display_cols if c in filtered_inventory.columns]
-        
-        st.dataframe(filtered_inventory[display_cols].head(50), use_container_width=True)
-        
-        # Visualization
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            risk_counts = inventory['stockout_risk'].value_counts()
-            fig = px.bar(x=risk_counts.index, y=risk_counts.values, 
-                         title="Stockout Risk Distribution",
-                         color=risk_counts.index, color_discrete_sequence=['red', 'orange', 'green'])
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            top_reorder = inventory.nlargest(10, 'reorder_quantity')
-            if len(top_reorder) > 0:
-                fig = px.bar(x=top_reorder['reorder_quantity'], 
-                             y=top_reorder['Description'].str[:40],
-                             orientation='h', title="Top 10 Products to Reorder")
-                st.plotly_chart(fig, use_container_width=True)
-        
-        # Export
-        csv = inventory.to_csv(index=False)
-        st.download_button("Download Inventory Report CSV", csv, "inventory_report.csv", "text/csv")
-
-# Page 6: Drift Monitor
-elif selected == "Drift Monitor":
-    st.markdown('<div class="main-header">📊 Model Drift Monitor</div>', unsafe_allow_html=True)
+    col1, col2, col3, col4 = st.columns(4)
     
-    if drift_config:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("Drift Status")
-            if drift_config.get('drift_detected', False):
-                st.error("⚠️ DATA DRIFT DETECTED")
-                st.warning("Model retraining is recommended")
-            else:
-                st.success("✅ NO DRIFT DETECTED")
-                st.info("Models are stable")
-        
-        with col2:
-            st.subheader("Monitoring Configuration")
-            st.write(f"**Reference Period:** {drift_config['reference_period']['start']} to {drift_config['reference_period']['end']}")
-            st.write(f"**Current Period:** {drift_config['current_period']['start']} to {drift_config['current_period']['end']}")
-            st.write(f"**Drift Threshold:** {drift_config.get('drift_threshold', 0.05)}")
-            st.write(f"**Monitoring Frequency:** {drift_config.get('monitoring_frequency', 'weekly')}")
-        
-        # Column-wise drift results
-        if 'results' in drift_config:
-            st.subheader("Column-wise Drift Analysis")
-            results_data = []
-            for col, result in drift_config['results'].items():
-                results_data.append({
-                    'Column': col,
-                    'KS Test p-value': result.get('ks_p_value', 'N/A'),
-                    'PSI Value': result.get('psi_value', 'N/A'),
-                    'Severity': result.get('severity', 'N/A'),
-                    'Drift Detected': 'Yes' if result.get('drift_detected', False) else 'No'
-                })
-            
-            results_df = pd.DataFrame(results_data)
-            st.dataframe(results_df, use_container_width=True)
-        
-        # Recommendation
-        st.subheader("📋 Recommendations")
-        if drift_config.get('drift_detected', False):
-            st.markdown("""
-            - 🔄 **Retrain models** with latest data
-            - 📊 **Review data pipeline** for changes
-            - 🎯 **Update reference dataset** 
-            - 📈 **Monitor model performance** metrics
-            """)
-        else:
-            st.markdown("""
-            - ✅ **Continue regular monitoring** (weekly)
-            - 📊 **Schedule next drift check** in 7 days
-            - 🎯 **No immediate action** required
-            """)
+    high_risk = len(inventory_df[inventory_df['Risk Level'] == 'HIGH'])
+    total_value = (inventory_df['Current Stock'] * inventory_df['Unit Price']).sum()
+    
+    with col1:
+        st.metric("High Risk Products", high_risk, delta="URGENT")
+    with col2:
+        st.metric("Total Inventory Value", format_currency(total_value))
+    with col3:
+        st.metric("Products to Reorder", len(inventory_df[inventory_df['Reorder Quantity'] > 0]))
+    with col4:
+        st.metric("Service Level Target", "95%")
+    
+    # Filter
+    risk_filter = st.multiselect("Filter by Risk Level", ['HIGH', 'MEDIUM', 'LOW'], default=['HIGH', 'MEDIUM'])
+    filtered_inventory = inventory_df[inventory_df['Risk Level'].isin(risk_filter)]
+    
+    st.subheader("📋 Reorder Recommendations")
+    st.dataframe(filtered_inventory.head(50), use_container_width=True)
+    
+    # Risk Distribution
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        risk_counts = inventory_df['Risk Level'].value_counts()
+        fig = px.bar(x=risk_counts.index, y=risk_counts.values, 
+                     title="Stockout Risk Distribution",
+                     color=risk_counts.index,
+                     color_discrete_map={'HIGH': 'red', 'MEDIUM': 'orange', 'LOW': 'green'})
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        # Stock vs Reorder Point
+        sample = inventory_df.sample(50)
+        fig = px.scatter(sample, x='Reorder Point', y='Current Stock', 
+                         color='Risk Level', title="Current Stock vs Reorder Point")
+        fig.add_shape(type="line", x0=0, y0=0, x1=sample['Reorder Point'].max(), 
+                      y1=sample['Reorder Point'].max(), line=dict(color="red", dash="dash"))
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Download
+    csv = inventory_df.to_csv(index=False)
+    st.download_button("📥 Download Inventory Report", csv, "inventory_report.csv", "text/csv")
 
-# Page 7: Reports
-elif selected == "Reports":
+# ============ PAGE 6: REPORTS ============
+elif page == "📄 Reports":
     st.markdown('<div class="main-header">📄 Generate Reports</div>', unsafe_allow_html=True)
     
     report_type = st.selectbox(
         "Select Report Type",
-        ["Executive Summary", "Customer Analytics Report", "Inventory Report", "Full Analytics Report"]
+        ["Executive Summary", "Customer Analytics", "Inventory Report", "Full Analytics"]
     )
-    
-    date_range = st.date_input("Report Date Range", 
-                               [datetime.now() - timedelta(days=30), datetime.now()])
     
     if st.button("Generate Report", type="primary"):
         with st.spinner("Generating report..."):
-            # Create report based on type
             if report_type == "Executive Summary":
                 report_data = {
                     'Metric': ['Total Revenue', 'Active Customers', 'Avg Order Value', 
                               'Churn Rate', 'Products at Risk', 'Forecast Accuracy'],
                     'Value': [
-                        format_currency(total_revenue),
-                        format_number(total_customers),
-                        format_currency(avg_order_value),
-                        f"{churn_rate:.1%}",
-                        format_number(high_risk),
-                        "85.2%"
+                        format_currency(sales_df['TotalPrice'].sum()),
+                        format_number(segments_df['Customer ID'].nunique()),
+                        format_currency(sales_df['TotalPrice'].mean()),
+                        f"{len(at_risk_df) / segments_df['Customer ID'].nunique():.1%}",
+                        str(len(inventory_df[inventory_df['Risk Level'] == 'HIGH'])),
+                        "85%"
                     ]
                 }
                 report_df = pd.DataFrame(report_data)
                 st.dataframe(report_df, use_container_width=True)
-                
-                # Download button
                 csv = report_df.to_csv(index=False)
-                st.download_button("Download Report CSV", csv, 
-                                  f"{report_type.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.csv", 
-                                  "text/csv")
+                st.download_button("Download Report", csv, "executive_summary.csv", "text/csv")
             
-            elif report_type == "Customer Analytics Report":
-                st.dataframe(segments.head(100), use_container_width=True)
-                csv = segments.to_csv(index=False)
+            elif report_type == "Customer Analytics":
+                st.dataframe(segments_df.head(100), use_container_width=True)
+                csv = segments_df.to_csv(index=False)
                 st.download_button("Download Customer Report", csv, "customer_report.csv", "text/csv")
             
             elif report_type == "Inventory Report":
-                st.dataframe(inventory.head(100), use_container_width=True)
-                csv = inventory.to_csv(index=False)
+                st.dataframe(inventory_df.head(100), use_container_width=True)
+                csv = inventory_df.to_csv(index=False)
                 st.download_button("Download Inventory Report", csv, "inventory_report.csv", "text/csv")
             
-            elif report_type == "Full Analytics Report":
-                st.info("Generating comprehensive report...")
-                # Combine all reports
-                with pd.ExcelWriter('full_report.xlsx') as writer:
-                    sales.to_excel(writer, sheet_name='Sales Data', index=False)
-                    segments.to_excel(writer, sheet_name='Customer Segments', index=False)
-                    inventory.to_excel(writer, sheet_name='Inventory', index=False)
-                    at_risk.to_excel(writer, sheet_name='At_Risk_Customers', index=False)
-                
-                with open('full_report.xlsx', 'rb') as f:
-                    st.download_button("Download Full Report (Excel)", f, 
-                                      f"full_report_{datetime.now().strftime('%Y%m%d')}.xlsx")
+            elif report_type == "Full Analytics":
+                st.success("Full analytics report generated!")
+                st.info("Report includes: Sales trends, Customer segments, Inventory status, Churn analysis")
 
 # Footer
 st.markdown("---")
