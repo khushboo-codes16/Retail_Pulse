@@ -1,5 +1,3 @@
-mkdir -p .streamlit
-cat > .streamlit/config.toml << 'EOF'
 [theme]
 primaryColor = "#1E88E5"
 backgroundColor = "#FFFFFF"
@@ -14,4 +12,3 @@ enableXsrfProtection = true
 
 [browser]
 gatherUsageStats = false
-EOF
